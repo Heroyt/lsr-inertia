@@ -1,7 +1,7 @@
 {
   "name": "lsr/inertia",
   "description": "Laser framework core - Inertia adapter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "repositories": [
     {
       "type": "composer",
@@ -45,9 +45,9 @@
   "minimum-stability": "stable",
   "require": {
     "php": ">=8.4",
-    "psr/http-server-middleware": "^1.0",
+    "psr/http-server-middleware": "^1",
     "lsr/interfaces": "^0.3.16",
-    "symfony/serializer": "^8.0"
+    "symfony/serializer": "^8|^7|^6"
   },
   "config": {
     "allow-plugins": {
