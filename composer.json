@@ -1,0 +1,59 @@
+{
+  "name": "lsr/inertia",
+  "description": "Laser framework core - Inertia adapter",
+  "version": "0.1.0",
+  "repositories": [
+    {
+      "type": "composer",
+      "url": "https://packages.laserliga.cz"
+    }
+  ],
+  "scripts": {
+    "test": "XDEBUG_MODE=coverage ./vendor/bin/phpunit",
+    "docs": "doxygen",
+    "phpstan": "./vendor/bin/phpstan",
+    "phpcs": "./vendor/bin/phpcs",
+    "cs": "./vendor/bin/phpcs",
+    "phpcbf": "./vendor/bin/phpcbf",
+    "cbf": "./vendor/bin/phpcbf"
+  },
+  "require-dev": {
+    "roave/security-advisories": "dev-latest",
+    "phpunit/phpunit": "^11",
+    "phpstan/phpstan": "^2.0",
+    "phpstan/extension-installer": "^1.2",
+    "squizlabs/php_codesniffer": "^3.11",
+    "nette/di": "^3.2",
+    "latte/latte": "^3.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "Lsr\\Inertia\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/"
+    }
+  },
+  "authors": [
+    {
+      "name": "Tomáš Vojík",
+      "email": "vojik@wboy.cz"
+    }
+  ],
+  "minimum-stability": "stable",
+  "require": {
+    "php": ">=8.4",
+    "psr/http-server-middleware": "^1.0",
+    "lsr/interfaces": "^0.3.16",
+    "symfony/serializer": "^8.0"
+  },
+  "config": {
+    "allow-plugins": {
+      "phpstan/extension-installer": true
+    }
+  },
+  "extra": {
+  }
+}
