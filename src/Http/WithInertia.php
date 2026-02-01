@@ -19,7 +19,7 @@ trait WithInertia
 {
 
     #[Inject]
-    protected InertiaFactoryInterface $inertiaFactory;
+    public InertiaFactoryInterface $inertiaFactory;
 
     /**
      * @param non-empty-string $component
