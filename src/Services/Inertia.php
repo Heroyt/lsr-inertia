@@ -60,6 +60,17 @@ class Inertia
             });
         }
 
+        // Filter-out framework props that might cause infinite recursion or are not needed in the frontend
+        if (isset($props['page'])) {
+            unset($props['page']);
+        }
+        if (isset($props['app'])) {
+            unset($props['app']);
+        }
+        if (isset($props['request'])) {
+            unset($props['request']);
+        }
+
         array_walk_recursive($props, function (&$prop) {
             if ($prop instanceof Closure || $prop instanceof LazyProp) {
                 $prop = $prop();
