@@ -17,53 +17,50 @@ class InertiaMiddleware implements MiddlewareInterface
 
     public function __construct(
         private readonly InertiaFactoryInterface $inertiaFactory,
-        private readonly string                  $attributeKey = self::INERTIA_ATTRIBUTE,
-    )
-    {
+        private readonly string $attributeKey = self::INERTIA_ATTRIBUTE,
+    ) {
     }
 
-    public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
-    {
+    public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface {
         $inertia = $this->inertiaFactory->fromRequest($request);
-
         $request = $request->withAttribute($this->attributeKey, $inertia);
 
-        if (!$request->hasHeader('X-Inertia')) {
-            return $handler->handle($request);
+        $response = $handler->handle($request);
+        if ( ! $request->hasHeader('X-Inertia')) {
+            return $response;
         }
 
-        /** @var ResponseInterface */
-        $response = $handler->handle($request)
-            ->withAddedHeader('Vary', 'Accept')
-            ->withAddedHeader('X-Inertia', 'true');
+        $response = $this->withVaryAccept($response)
+            ->withHeader('X-Inertia', 'true');
 
         $response = $this->checkVersion($request, $response, $inertia);
         $response = $this->changeRedirectCode($request, $response);
 
+        if ($response->getStatusCode() !== 409 && $response->hasHeader('X-Inertia-Location')) {
+            return $response->withoutHeader('X-Inertia-Location');
+        }
+
         return $response;
     }
 
-    private function checkVersion(ServerRequestInterface $request, ResponseInterface $response, Inertia $inertia): ResponseInterface
-    {
+    private function checkVersion(ServerRequestInterface $request, ResponseInterface $response, Inertia $inertia): ResponseInterface {
         if (
-            'GET' === $request->getMethod()
-            && $request->getHeader('X-Inertia-Version') !== $inertia->version
+            $inertia->version !== null
+            && $request->getMethod() === 'GET'
+            && $request->getHeaderLine('X-Inertia-Version') !== $inertia->version
         ) {
-            return $response->withAddedHeader('X-Inertia-Location', $request->getUri()->getPath());
+            return $response
+                ->withStatus(409)
+                ->withHeader('X-Inertia-Location', $request->getUri()->getPath());
         }
 
         return $response;
     }
 
-    private function changeRedirectCode(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
-    {
-        if (!$request->hasHeader('X-Inertia')) {
-            return $response;
-        }
-
+    private function changeRedirectCode(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface {
         if (
-            302 === $response->getStatusCode()
-            && in_array($request->getMethod(), ['PUT', 'PATCH', 'DELETE'])
+            $response->getStatusCode() === 302
+            && in_array($request->getMethod(), ['PUT', 'PATCH', 'DELETE'], true)
         ) {
             return $response->withStatus(303);
         }
@@ -71,12 +68,23 @@ class InertiaMiddleware implements MiddlewareInterface
         // For External redirects
         // https://inertiajs.com/redirects#external-redirects
         if (
-            409 === $response->getStatusCode()
+            $response->getStatusCode() === 409
             && $response->hasHeader('X-Inertia-Location')
         ) {
             return $response->withoutHeader('X-Inertia');
         }
 
         return $response;
+    }
+
+    private function withVaryAccept(ResponseInterface $response): ResponseInterface {
+        foreach ($response->getHeader('Vary') as $value) {
+            $values = array_map('trim', explode(',', strtolower($value)));
+            if (in_array('accept', $values, true)) {
+                return $response;
+            }
+        }
+
+        return $response->withAddedHeader('Vary', 'Accept');
     }
 }
