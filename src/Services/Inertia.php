@@ -6,8 +6,10 @@ namespace Lsr\Inertia\Services;
 
 use Lsr\Exceptions\TemplateDoesNotExistException;
 use Lsr\Inertia\Data\AlwaysProp;
+use Lsr\Inertia\Data\DeepMergeProp;
 use Lsr\Inertia\Data\DeferredProp;
 use Lsr\Inertia\Data\LazyProp;
+use Lsr\Inertia\Data\MergeProp;
 use Lsr\Inertia\Resolver\PropResolver;
 use Lsr\Interfaces\TemplateParametersInterface;
 use Lsr\Interfaces\ViewFactoryInterface;
@@ -45,6 +47,14 @@ class Inertia
      */
     public function defer(callable $callback, string $group = 'default', bool $rescue = false): DeferredProp {
         return new DeferredProp($callback, $group, $rescue);
+    }
+
+    public function merge(mixed $value): MergeProp {
+        return new MergeProp($value);
+    }
+
+    public function deepMerge(mixed $value): DeepMergeProp {
+        return new DeepMergeProp($value);
     }
 
     /**

@@ -176,6 +176,64 @@ class InertiaTest extends TestCase
         self::assertSame(['permissions'], $page['rescuedProps']);
     }
 
+    public function testMergePropAddsRootMergeMetadata(): void {
+        $inertia = $this->createInertia([
+            'X-Inertia' => 'true',
+        ]);
+
+        $response = $inertia->render('Feed/Index', [
+            'posts' => $inertia->merge([
+                ['id' => 1, 'title' => 'First post'],
+            ]),
+        ]);
+
+        $page = $this->getPage($response);
+
+        self::assertSame([['id' => 1, 'title' => 'First post']], $page['props']['posts']);
+        self::assertSame(['posts'], $page['mergeProps']);
+    }
+
+    public function testMergePropSupportsNestedAppendPrependAndMatching(): void {
+        $inertia = $this->createInertia([
+            'X-Inertia' => 'true',
+        ]);
+
+        $response = $inertia->render('Feed/Index', [
+            'feed' => $inertia
+                ->merge([
+                    'posts' => [['id' => 1]],
+                    'notifications' => [['uuid' => 'a']],
+                ])
+                ->append('posts', matchOn: 'id')
+                ->prepend(['notifications' => 'uuid']),
+        ]);
+
+        $page = $this->getPage($response);
+
+        self::assertSame(['feed.posts'], $page['mergeProps']);
+        self::assertSame(['feed.notifications'], $page['prependProps']);
+        self::assertSame(['feed.posts.id', 'feed.notifications.uuid'], $page['matchPropsOn']);
+    }
+
+    public function testDeepMergePropAddsMetadataAndMatchPaths(): void {
+        $inertia = $this->createInertia([
+            'X-Inertia' => 'true',
+        ]);
+
+        $response = $inertia->render('Chat/Index', [
+            'chat' => $inertia
+                ->deepMerge([
+                    'messages' => [['id' => 1]],
+                ])
+                ->matchOn('messages.id'),
+        ]);
+
+        $page = $this->getPage($response);
+
+        self::assertSame(['chat'], $page['deepMergeProps']);
+        self::assertSame(['chat.messages.id'], $page['matchPropsOn']);
+    }
+
     /**
      * @param array<string, string> $headers
      */

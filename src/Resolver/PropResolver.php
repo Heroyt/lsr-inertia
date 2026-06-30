@@ -6,9 +6,11 @@ namespace Lsr\Inertia\Resolver;
 
 use Closure;
 use Lsr\Inertia\Data\AlwaysProp;
+use Lsr\Inertia\Data\DeepMergeProp;
 use Lsr\Inertia\Data\DeferredProp;
 use Lsr\Inertia\Data\InertiaPropInterface;
 use Lsr\Inertia\Data\LazyProp;
+use Lsr\Inertia\Data\MergeProp;
 use Lsr\Inertia\Http\InertiaRequest;
 use Psr\Http\Message\ServerRequestInterface;
 use Throwable;
@@ -33,6 +35,10 @@ final readonly class PropResolver
         $resolved = [];
         $deferred = [];
         $rescued = [];
+        $merge = [];
+        $prepend = [];
+        $deepMerge = [];
+        $matchOn = [];
 
         foreach ($props as $key => $prop) {
             if ($prop instanceof AlwaysProp) {
@@ -62,10 +68,21 @@ final readonly class PropResolver
                 continue;
             }
 
+            if ($prop instanceof MergeProp) {
+                array_push($merge, ...$this->prefixPaths($key, $prop->getAppendPaths()));
+                array_push($prepend, ...$this->prefixPaths($key, $prop->getPrependPaths()));
+                array_push($matchOn, ...$this->prefixStringPaths($key, $prop->getMatchOn()));
+            }
+
+            if ($prop instanceof DeepMergeProp) {
+                $deepMerge[] = $key;
+                array_push($matchOn, ...$this->prefixStringPaths($key, $prop->getMatchOn()));
+            }
+
             $resolved[$key] = $this->resolveValue($prop);
         }
 
-        return new ResolvedPageProps($resolved, $deferred, $rescued);
+        return new ResolvedPageProps($resolved, $deferred, $rescued, $merge, $prepend, $deepMerge, $matchOn);
     }
 
     /**
@@ -117,5 +134,29 @@ final readonly class PropResolver
         }
 
         return $value;
+    }
+
+    /**
+     * @param list<string|null> $paths
+     *
+     * @return list<string>
+     */
+    private function prefixPaths(string $key, array $paths): array {
+        return array_map(
+            static fn(?string $path): string => $path === null ? $key : $key . '.' . $path,
+            $paths,
+        );
+    }
+
+    /**
+     * @param list<string> $paths
+     *
+     * @return list<string>
+     */
+    private function prefixStringPaths(string $key, array $paths): array {
+        return array_map(
+            static fn(string $path): string => $key . '.' . $path,
+            $paths,
+        );
     }
 }
