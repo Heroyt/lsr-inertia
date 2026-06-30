@@ -79,6 +79,103 @@ class InertiaTest extends TestCase
         self::assertArrayNotHasKey('companies', $props);
     }
 
+    public function testClosuresResolveWhenIncluded(): void {
+        $response = $this->createInertia([
+            'X-Inertia' => 'true',
+        ])->render('Users/Index', [
+            'users' => static fn(): array => ['John'],
+            'nested' => [
+                'companies' => static fn(): array => ['Acme'],
+            ],
+        ]);
+
+        $props = $this->getProps($response);
+
+        self::assertSame(['John'], $props['users']);
+        self::assertSame(['Acme'], $props['nested']['companies']);
+    }
+
+    public function testAlwaysPropIsIncludedOnPartialReloads(): void {
+        $inertia = $this->createInertia([
+            'X-Inertia' => 'true',
+            'X-Inertia-Partial-Component' => 'Users/Index',
+            'X-Inertia-Partial-Data' => 'users',
+        ]);
+
+        $response = $inertia->render('Users/Index', [
+            'users' => ['John'],
+            'stats' => $inertia->always(static fn(): array => ['count' => 10]),
+            'companies' => ['Acme'],
+        ]);
+
+        $props = $this->getProps($response);
+
+        self::assertSame(['John'], $props['users']);
+        self::assertSame(['count' => 10], $props['stats']);
+        self::assertArrayNotHasKey('companies', $props);
+    }
+
+    public function testDeferredPropsAreOmittedFromInitialResponseWithMetadata(): void {
+        $inertia = $this->createInertia([
+            'X-Inertia' => 'true',
+        ]);
+
+        $response = $inertia->render('Users/Index', [
+            'users' => ['John'],
+            'permissions' => $inertia->defer(static fn(): array => ['edit']),
+            'teams' => $inertia->defer(static fn(): array => ['Blue'], 'attributes'),
+        ]);
+
+        $page = $this->getPage($response);
+
+        self::assertSame(['John'], $page['props']['users']);
+        self::assertArrayNotHasKey('permissions', $page['props']);
+        self::assertArrayNotHasKey('teams', $page['props']);
+        self::assertSame([
+            'default' => ['permissions'],
+            'attributes' => ['teams'],
+        ], $page['deferredProps']);
+    }
+
+    public function testDeferredPropsResolveOnMatchingPartialReload(): void {
+        $inertia = $this->createInertia([
+            'X-Inertia' => 'true',
+            'X-Inertia-Partial-Component' => 'Users/Index',
+            'X-Inertia-Partial-Data' => 'permissions',
+        ]);
+
+        $response = $inertia->render('Users/Index', [
+            'users' => ['John'],
+            'permissions' => $inertia->defer(static fn(): array => ['edit']),
+        ]);
+
+        $page = $this->getPage($response);
+
+        self::assertSame(['edit'], $page['props']['permissions']);
+        self::assertArrayNotHasKey('users', $page['props']);
+        self::assertArrayNotHasKey('deferredProps', $page);
+    }
+
+    public function testRescuedDeferredPropsAreReportedWhenResolutionFails(): void {
+        $inertia = $this->createInertia([
+            'X-Inertia' => 'true',
+            'X-Inertia-Partial-Component' => 'Users/Index',
+            'X-Inertia-Partial-Data' => 'permissions',
+        ]);
+
+        $response = $inertia->render('Users/Index', [
+            'permissions' => $inertia->defer(
+                static fn(): array => throw new \RuntimeException('Failed to load permissions.'),
+                rescue: true,
+            ),
+        ]);
+
+        $page = $this->getPage($response);
+
+        self::assertArrayNotHasKey('permissions', $page['props']);
+        self::assertSame(['permissions'], $page['rescuedProps']);
+    }
+
     /**
      * @param array<string, string> $headers
      */
@@ -101,9 +198,16 @@ class InertiaTest extends TestCase
      * @return array<string, mixed>
      */
     private function getProps(\Psr\Http\Message\ResponseInterface $response): array {
-        /** @var array{props: array<string, mixed>} $page */
+        return $this->getPage($response)['props'];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function getPage(\Psr\Http\Message\ResponseInterface $response): array {
+        /** @var array<string, mixed> $page */
         $page = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
 
-        return $page['props'];
+        return $page;
     }
 }

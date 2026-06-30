@@ -1,0 +1,121 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Lsr\Inertia\Resolver;
+
+use Closure;
+use Lsr\Inertia\Data\AlwaysProp;
+use Lsr\Inertia\Data\DeferredProp;
+use Lsr\Inertia\Data\InertiaPropInterface;
+use Lsr\Inertia\Data\LazyProp;
+use Lsr\Inertia\Http\InertiaRequest;
+use Psr\Http\Message\ServerRequestInterface;
+use Throwable;
+
+final readonly class PropResolver
+{
+    public function __construct(
+        private ServerRequestInterface $request,
+    ) {
+    }
+
+    /**
+     * @param array<string, mixed> $props
+     */
+    public function resolve(string $component, array $props): ResolvedPageProps {
+        $props = $this->filterFrameworkProps($props);
+        $request = new InertiaRequest($this->request);
+        $isPartial = $request->isPartialFor($component);
+        $only = array_flip($request->only());
+        $except = array_flip($request->except());
+
+        $resolved = [];
+        $deferred = [];
+        $rescued = [];
+
+        foreach ($props as $key => $prop) {
+            if ($prop instanceof AlwaysProp) {
+                $resolved[$key] = $this->resolveValue($prop);
+                continue;
+            }
+
+            if ($isPartial && !$this->shouldIncludePartialProp($key, $only, $except, $request)) {
+                continue;
+            }
+
+            if (!$isPartial && $prop instanceof LazyProp) {
+                continue;
+            }
+
+            if (!$isPartial && $prop instanceof DeferredProp) {
+                $deferred[$prop->getGroup()][] = $key;
+                continue;
+            }
+
+            if ($prop instanceof DeferredProp && $prop->shouldRescue()) {
+                try {
+                    $resolved[$key] = $this->resolveValue($prop);
+                } catch (Throwable) {
+                    $rescued[] = $key;
+                }
+                continue;
+            }
+
+            $resolved[$key] = $this->resolveValue($prop);
+        }
+
+        return new ResolvedPageProps($resolved, $deferred, $rescued);
+    }
+
+    /**
+     * @param array<string, mixed> $props
+     *
+     * @return array<string, mixed>
+     */
+    private function filterFrameworkProps(array $props): array {
+        unset($props['page'], $props['app'], $props['request']);
+
+        return $props;
+    }
+
+    /**
+     * @param array<string, int> $only
+     * @param array<string, int> $except
+     */
+    private function shouldIncludePartialProp(string $key, array $only, array $except, InertiaRequest $request): bool {
+        if ($request->hasOnly()) {
+            return isset($only[$key]);
+        }
+
+        if ($request->hasExcept()) {
+            return !isset($except[$key]);
+        }
+
+        return true;
+    }
+
+    private function resolveValue(mixed $value): mixed {
+        if ($value instanceof InertiaPropInterface) {
+            return $this->resolveNestedValue($value->resolve());
+        }
+
+        return $this->resolveNestedValue($value);
+    }
+
+    private function resolveNestedValue(mixed $value): mixed {
+        if ($value instanceof Closure) {
+            return $this->resolveNestedValue($value());
+        }
+
+        if (!is_array($value)) {
+            return $value;
+        }
+
+        foreach ($value as $key => $nestedValue) {
+            $value[$key] = $this->resolveNestedValue($nestedValue);
+        }
+
+        return $value;
+    }
+}
