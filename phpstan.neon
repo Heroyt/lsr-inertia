@@ -8,4 +8,8 @@ parameters:
 	level: 8
 	paths:
 		- src
+	ignoreErrors:
+		-
+			identifier: trait.unused
+			path: src/Http/WithInertia.php
 	tmpDir: temp
