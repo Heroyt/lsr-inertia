@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Lsr\Inertia\Middleware;
@@ -12,7 +13,6 @@ use Psr\Http\Server\RequestHandlerInterface;
 
 class InertiaMiddleware implements MiddlewareInterface
 {
-
     public const string INERTIA_ATTRIBUTE = 'inertia';
 
     public function __construct(
@@ -26,11 +26,11 @@ class InertiaMiddleware implements MiddlewareInterface
         $request = $request->withAttribute($this->attributeKey, $inertia);
 
         $response = $handler->handle($request);
-        if ( ! $request->hasHeader('X-Inertia')) {
+        if (! $request->hasHeader('X-Inertia')) {
             return $response;
         }
 
-        $response = $this->withVaryAccept($response)
+        $response = $this->withVaryInertia($response)
             ->withHeader('X-Inertia', 'true');
 
         $response = $this->checkVersion($request, $response, $inertia);
@@ -43,7 +43,11 @@ class InertiaMiddleware implements MiddlewareInterface
         return $response;
     }
 
-    private function checkVersion(ServerRequestInterface $request, ResponseInterface $response, Inertia $inertia): ResponseInterface {
+    private function checkVersion(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        Inertia $inertia,
+    ): ResponseInterface {
         if (
             $inertia->version !== null
             && $request->getMethod() === 'GET'
@@ -51,13 +55,16 @@ class InertiaMiddleware implements MiddlewareInterface
         ) {
             return $response
                 ->withStatus(409)
-                ->withHeader('X-Inertia-Location', $request->getUri()->getPath());
+                ->withHeader('X-Inertia-Location', (string) $request->getUri());
         }
 
         return $response;
     }
 
-    private function changeRedirectCode(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface {
+    private function changeRedirectCode(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ): ResponseInterface {
         if (
             $response->getStatusCode() === 302
             && in_array($request->getMethod(), ['PUT', 'PATCH', 'DELETE'], true)
@@ -77,14 +84,14 @@ class InertiaMiddleware implements MiddlewareInterface
         return $response;
     }
 
-    private function withVaryAccept(ResponseInterface $response): ResponseInterface {
+    private function withVaryInertia(ResponseInterface $response): ResponseInterface {
         foreach ($response->getHeader('Vary') as $value) {
             $values = array_map('trim', explode(',', strtolower($value)));
-            if (in_array('accept', $values, true)) {
+            if (in_array('x-inertia', $values, true)) {
                 return $response;
             }
         }
 
-        return $response->withAddedHeader('Vary', 'Accept');
+        return $response->withAddedHeader('Vary', 'X-Inertia');
     }
 }

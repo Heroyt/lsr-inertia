@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Lsr\Inertia\Services;
@@ -18,7 +19,6 @@ use Symfony\Component\Serializer\SerializerInterface;
 
 class Inertia
 {
-
     public ?string $version = null;
 
     public function __construct(
@@ -27,11 +27,13 @@ class Inertia
         private readonly StreamFactoryInterface   $streamFactory,
         private readonly ViewFactoryInterface     $viewFactory,
         private readonly SerializerInterface      $serializer,
-    )
-    {
+    ) {
     }
 
     /**
+     * @param array<string, mixed>|TemplateParametersInterface $parameters
+     * @param non-empty-string $template
+     *
      * @throws ExceptionInterface
      * @throws TemplateDoesNotExistException
      */
@@ -40,8 +42,7 @@ class Inertia
         array|TemplateParametersInterface $parameters = [],
         string|UriInterface|null          $url = null,
         string                            $template = 'pages/index',
-    ): ResponseInterface
-    {
+    ): ResponseInterface {
 
         /** @var array<string,mixed> $props */
         $props = $parameters instanceof TemplateParametersInterface
@@ -49,11 +50,18 @@ class Inertia
             : $parameters;
 
 
-        if ($this->request->hasHeader('X-Inertia-Partial-Data')) {
-            $only = explode(',', $this->request->getHeaderLine('X-Inertia-Partial-Data'));
-            $props = ($only && $this->request->getHeaderLine('X-Inertia-Partial-Component') === $component)
-                ? array_intersect_key($props, array_flip($only))
-                : $props;
+        if ($this->isPartialRequestFor($component)) {
+            if ($this->request->hasHeader('X-Inertia-Partial-Data')) {
+                $props = array_intersect_key(
+                    $props,
+                    array_flip($this->getPartialHeaderValues('X-Inertia-Partial-Data')),
+                );
+            } elseif ($this->request->hasHeader('X-Inertia-Partial-Except')) {
+                $props = array_diff_key(
+                    $props,
+                    array_flip($this->getPartialHeaderValues('X-Inertia-Partial-Except')),
+                );
+            }
         } else {
             $props = array_filter($props, function ($prop) {
                 return !$prop instanceof LazyProp;
@@ -88,13 +96,20 @@ class Inertia
             $json = $this->serializer->serialize($page, 'json');
             return $this->responseFactory->createResponse()
                 ->withBody($this->streamFactory->createStream($json))
-                ->withHeader('Content-Type', 'application/json');
+                ->withHeader('Content-Type', 'application/json')
+                ->withHeader('X-Inertia', 'true');
         }
 
         // Pass inertia data to the template
-        $parameters['inertiaPage'] = $page;
+        if ($parameters instanceof TemplateParametersInterface) {
+            $parameters['inertiaPage'] = $page;
+            $templateParameters = $parameters;
+        } else {
+            $templateParameters = $parameters;
+            $templateParameters['inertiaPage'] = $page;
+        }
 
-        $html = $this->viewFactory->viewToString($template, $parameters);
+        $html = $this->viewFactory->viewToString($template, $templateParameters);
 
 
         return $this->responseFactory->createResponse()
@@ -102,4 +117,25 @@ class Inertia
             ->withHeader('Content-Type', 'text/html; charset=UTF-8');
     }
 
+    private function isPartialRequestFor(string $component): bool {
+        return $this->request->getHeaderLine('X-Inertia-Partial-Component') === $component
+            && (
+                $this->request->hasHeader('X-Inertia-Partial-Data')
+                || $this->request->hasHeader('X-Inertia-Partial-Except')
+            );
+    }
+
+    /**
+     * @return non-empty-list<string>
+     */
+    private function getPartialHeaderValues(string $header): array {
+        $values = array_values(
+            array_filter(
+                array_map('trim', explode(',', $this->request->getHeaderLine($header))),
+                static fn(string $value): bool => $value !== '',
+            ),
+        );
+
+        return $values === [] ? [''] : $values;
+    }
 }
