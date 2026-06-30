@@ -29,6 +29,13 @@ final readonly class InertiaRequest
     /**
      * @return string[]
      */
+    public function exceptOnceProps(): array {
+        return $this->getHeaderValues('X-Inertia-Except-Once-Props');
+    }
+
+    /**
+     * @return string[]
+     */
     public function only(): array {
         return $this->getHeaderValues('X-Inertia-Partial-Data');
     }

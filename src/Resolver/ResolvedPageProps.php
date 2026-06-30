@@ -14,6 +14,7 @@ final readonly class ResolvedPageProps
      * @param list<string> $prependProps
      * @param list<string> $deepMergeProps
      * @param list<string> $matchPropsOn
+     * @param array<string, array{prop: string, expiresAt: int|null}> $onceProps
      */
     public function __construct(
         public array $props,
@@ -23,6 +24,7 @@ final readonly class ResolvedPageProps
         public array $prependProps = [],
         public array $deepMergeProps = [],
         public array $matchPropsOn = [],
+        public array $onceProps = [],
     ) {
     }
 
@@ -54,6 +56,10 @@ final readonly class ResolvedPageProps
 
         if ($this->matchPropsOn !== []) {
             $metadata['matchPropsOn'] = $this->matchPropsOn;
+        }
+
+        if ($this->onceProps !== []) {
+            $metadata['onceProps'] = $this->onceProps;
         }
 
         return $metadata;

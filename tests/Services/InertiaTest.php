@@ -8,6 +8,7 @@ use Lsr\Inertia\Data\LazyProp;
 use Lsr\Inertia\Services\Inertia;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\ResponseInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\Serializer;
 use Tests\Fixtures\StringViewFactory;
@@ -234,6 +235,98 @@ class InertiaTest extends TestCase
         self::assertSame(['chat.messages.id'], $page['matchPropsOn']);
     }
 
+    public function testOncePropResolvesAndAddsMetadata(): void {
+        $inertia = $this->createInertia([
+            'X-Inertia' => 'true',
+        ]);
+
+        $response = $inertia->render('Billing/Plans', [
+            'plans' => $inertia->once(static fn(): array => ['Basic']),
+        ]);
+
+        $page = $this->getPage($response);
+
+        self::assertSame(['Basic'], $page['props']['plans']);
+        self::assertSame([
+            'plans' => [
+                'prop' => 'plans',
+                'expiresAt' => null,
+            ],
+        ], $page['onceProps']);
+    }
+
+    public function testOncePropSkipsAlreadyLoadedValueButKeepsMetadata(): void {
+        $inertia = $this->createInertia([
+            'X-Inertia' => 'true',
+            'X-Inertia-Except-Once-Props' => 'plans',
+        ]);
+
+        $response = $inertia->render('Billing/Upgrade', [
+            'plans' => $inertia->once(static fn(): array => ['Basic']),
+            'currentPlan' => 'Basic',
+        ]);
+
+        $page = $this->getPage($response);
+
+        self::assertArrayNotHasKey('plans', $page['props']);
+        self::assertSame('Basic', $page['props']['currentPlan']);
+        self::assertSame([
+            'plans' => [
+                'prop' => 'plans',
+                'expiresAt' => null,
+            ],
+        ], $page['onceProps']);
+    }
+
+    public function testExplicitPartialReloadResolvesOnceProp(): void {
+        $inertia = $this->createInertia([
+            'X-Inertia' => 'true',
+            'X-Inertia-Partial-Component' => 'Billing/Plans',
+            'X-Inertia-Partial-Data' => 'plans',
+            'X-Inertia-Except-Once-Props' => 'plans',
+        ]);
+
+        $response = $inertia->render('Billing/Plans', [
+            'plans' => $inertia->once(static fn(): array => ['Basic']),
+        ]);
+
+        $page = $this->getPage($response);
+
+        self::assertSame(['Basic'], $page['props']['plans']);
+    }
+
+    public function testFreshOncePropForcesResolution(): void {
+        $inertia = $this->createInertia([
+            'X-Inertia' => 'true',
+            'X-Inertia-Except-Once-Props' => 'plans',
+        ]);
+
+        $response = $inertia->render('Billing/Plans', [
+            'plans' => $inertia->once(static fn(): array => ['Basic'])->fresh(),
+        ]);
+
+        $page = $this->getPage($response);
+
+        self::assertSame(['Basic'], $page['props']['plans']);
+    }
+
+    public function testExpiredOncePropForcesResolutionAndSupportsCustomKey(): void {
+        $inertia = $this->createInertia([
+            'X-Inertia' => 'true',
+            'X-Inertia-Except-Once-Props' => 'billing.plans',
+        ]);
+
+        $response = $inertia->render('Billing/Plans', [
+            'plans' => $inertia->once(static fn(): array => ['Basic'], 'billing.plans')->until(-1),
+        ]);
+
+        $page = $this->getPage($response);
+
+        self::assertSame(['Basic'], $page['props']['plans']);
+        self::assertSame('plans', $page['onceProps']['billing.plans']['prop']);
+        self::assertIsInt($page['onceProps']['billing.plans']['expiresAt']);
+    }
+
     /**
      * @param array<string, string> $headers
      */
@@ -255,14 +348,14 @@ class InertiaTest extends TestCase
     /**
      * @return array<string, mixed>
      */
-    private function getProps(\Psr\Http\Message\ResponseInterface $response): array {
+    private function getProps(ResponseInterface $response): array {
         return $this->getPage($response)['props'];
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function getPage(\Psr\Http\Message\ResponseInterface $response): array {
+    private function getPage(ResponseInterface $response): array {
         /** @var array<string, mixed> $page */
         $page = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
 

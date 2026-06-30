@@ -11,6 +11,7 @@ use Lsr\Inertia\Data\DeferredProp;
 use Lsr\Inertia\Data\InertiaPropInterface;
 use Lsr\Inertia\Data\LazyProp;
 use Lsr\Inertia\Data\MergeProp;
+use Lsr\Inertia\Data\OnceProp;
 use Lsr\Inertia\Http\InertiaRequest;
 use Psr\Http\Message\ServerRequestInterface;
 use Throwable;
@@ -39,6 +40,8 @@ final readonly class PropResolver
         $prepend = [];
         $deepMerge = [];
         $matchOn = [];
+        $once = [];
+        $exceptOnce = array_flip($request->exceptOnceProps());
 
         foreach ($props as $key => $prop) {
             if ($prop instanceof AlwaysProp) {
@@ -68,6 +71,23 @@ final readonly class PropResolver
                 continue;
             }
 
+            if ($prop instanceof OnceProp) {
+                $onceKey = $prop->getKey($key);
+                $once[$onceKey] = [
+                    'prop' => $key,
+                    'expiresAt' => $prop->getExpiresAt(),
+                ];
+
+                if (
+                    !$this->isExplicitlyRequested($key, $only, $request)
+                    && isset($exceptOnce[$onceKey])
+                    && !$prop->shouldFresh()
+                    && !$prop->isExpired()
+                ) {
+                    continue;
+                }
+            }
+
             if ($prop instanceof MergeProp) {
                 array_push($merge, ...$this->prefixPaths($key, $prop->getAppendPaths()));
                 array_push($prepend, ...$this->prefixPaths($key, $prop->getPrependPaths()));
@@ -82,7 +102,7 @@ final readonly class PropResolver
             $resolved[$key] = $this->resolveValue($prop);
         }
 
-        return new ResolvedPageProps($resolved, $deferred, $rescued, $merge, $prepend, $deepMerge, $matchOn);
+        return new ResolvedPageProps($resolved, $deferred, $rescued, $merge, $prepend, $deepMerge, $matchOn, $once);
     }
 
     /**
@@ -110,6 +130,13 @@ final readonly class PropResolver
         }
 
         return true;
+    }
+
+    /**
+     * @param array<string, int> $only
+     */
+    private function isExplicitlyRequested(string $key, array $only, InertiaRequest $request): bool {
+        return $request->hasOnly() && isset($only[$key]);
     }
 
     private function resolveValue(mixed $value): mixed {

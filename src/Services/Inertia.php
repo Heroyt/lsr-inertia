@@ -10,6 +10,7 @@ use Lsr\Inertia\Data\DeepMergeProp;
 use Lsr\Inertia\Data\DeferredProp;
 use Lsr\Inertia\Data\LazyProp;
 use Lsr\Inertia\Data\MergeProp;
+use Lsr\Inertia\Data\OnceProp;
 use Lsr\Inertia\Resolver\PropResolver;
 use Lsr\Interfaces\TemplateParametersInterface;
 use Lsr\Interfaces\ViewFactoryInterface;
@@ -55,6 +56,10 @@ class Inertia
 
     public function deepMerge(mixed $value): DeepMergeProp {
         return new DeepMergeProp($value);
+    }
+
+    public function once(callable $callback, ?string $key = null): OnceProp {
+        return new OnceProp($callback, $key);
     }
 
     /**
