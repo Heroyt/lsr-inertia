@@ -11,6 +11,8 @@ use Lsr\Inertia\Data\DeferredProp;
 use Lsr\Inertia\Data\LazyProp;
 use Lsr\Inertia\Data\MergeProp;
 use Lsr\Inertia\Data\OnceProp;
+use Lsr\Inertia\Lifecycle\InertiaLifecycleHookInterface;
+use Lsr\Inertia\Lifecycle\InertiaLifecycleScopeInterface;
 use Lsr\Inertia\Resolver\PropResolver;
 use Lsr\Interfaces\TemplateParametersInterface;
 use Lsr\Interfaces\ViewFactoryInterface;
@@ -21,10 +23,12 @@ use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Message\UriInterface;
 use Symfony\Component\Serializer\Exception\ExceptionInterface;
 use Symfony\Component\Serializer\SerializerInterface;
+use Throwable;
 
 class Inertia
 {
     public ?string $version = null;
+    private ?InertiaLifecycleHookInterface $lifecycleHook = null;
 
     public function __construct(
         private readonly ServerRequestInterface   $request,
@@ -33,6 +37,11 @@ class Inertia
         private readonly ViewFactoryInterface     $viewFactory,
         private readonly SerializerInterface      $serializer,
     ) {
+    }
+
+    public function setLifecycleHook(InertiaLifecycleHookInterface $hook): static {
+        $this->lifecycleHook = $hook;
+        return $this;
     }
 
     public function lazy(callable $callback): LazyProp {
@@ -81,37 +90,77 @@ class Inertia
             ? $parameters->getProps()
             : $parameters;
 
-        $resolvedProps = (new PropResolver($this->request))->resolve($component, $props);
+        $scope = $this->beginLifecycle(
+            $component,
+            count($props),
+            $this->request->hasHeader('X-Inertia'),
+        );
+        $resolvedPropCount = 0;
+        $deferredPropCount = 0;
+        $rescuedPropCount = 0;
 
-        $page = array_merge([
-            'component' => $component,
-            'props' => $resolvedProps->props,
-            'url' => $url ? (string)$url : (string)$this->request->getUri(),
-            'version' => $this->version,
-        ], $resolvedProps->getPageMetadata());
+        try {
+            $resolvedProps = (new PropResolver($this->request))->resolve($component, $props);
+            $resolvedPropCount = count($resolvedProps->props);
+            foreach ($resolvedProps->deferredProps as $deferredProps) {
+                $deferredPropCount += count($deferredProps);
+            }
+            $rescuedPropCount = count($resolvedProps->rescuedProps);
 
-        if ($this->request->hasHeader('X-Inertia')) {
-            $json = $this->serializer->serialize($page, 'json');
+            $page = array_merge([
+                'component' => $component,
+                'props' => $resolvedProps->props,
+                'url' => $url ? (string)$url : (string)$this->request->getUri(),
+                'version' => $this->version,
+            ], $resolvedProps->getPageMetadata());
+
+            if ($this->request->hasHeader('X-Inertia')) {
+                $json = $this->serializer->serialize($page, 'json');
+                return $this->responseFactory->createResponse()
+                    ->withBody($this->streamFactory->createStream($json))
+                    ->withHeader('Content-Type', 'application/json')
+                    ->withHeader('X-Inertia', 'true');
+            }
+
+            // Pass inertia data to the template
+            if ($parameters instanceof TemplateParametersInterface) {
+                $parameters['inertiaPage'] = $page;
+                $templateParameters = $parameters;
+            } else {
+                $templateParameters = $parameters;
+                $templateParameters['inertiaPage'] = $page;
+            }
+
+            $html = $this->viewFactory->viewToString($template, $templateParameters);
+
             return $this->responseFactory->createResponse()
-                ->withBody($this->streamFactory->createStream($json))
-                ->withHeader('Content-Type', 'application/json')
-                ->withHeader('X-Inertia', 'true');
+                ->withBody($this->streamFactory->createStream($html))
+                ->withHeader('Content-Type', 'text/html; charset=UTF-8');
+        } catch (Throwable $exception) {
+            try {
+                $scope?->recordException($exception);
+            } catch (Throwable) {
+                // Lifecycle hooks must never affect Inertia rendering.
+            }
+            throw $exception;
+        } finally {
+            try {
+                $scope?->complete($resolvedPropCount, $deferredPropCount, $rescuedPropCount);
+            } catch (Throwable) {
+                // Lifecycle hooks must never affect Inertia rendering.
+            }
         }
+    }
 
-        // Pass inertia data to the template
-        if ($parameters instanceof TemplateParametersInterface) {
-            $parameters['inertiaPage'] = $page;
-            $templateParameters = $parameters;
-        } else {
-            $templateParameters = $parameters;
-            $templateParameters['inertiaPage'] = $page;
+    private function beginLifecycle(
+        string $component,
+        int $inputPropCount,
+        bool $inertiaRequest,
+    ): ?InertiaLifecycleScopeInterface {
+        try {
+            return $this->lifecycleHook?->begin($component, $inputPropCount, $inertiaRequest);
+        } catch (Throwable) {
+            return null;
         }
-
-        $html = $this->viewFactory->viewToString($template, $templateParameters);
-
-
-        return $this->responseFactory->createResponse()
-            ->withBody($this->streamFactory->createStream($html))
-            ->withHeader('Content-Type', 'text/html; charset=UTF-8');
     }
 }
