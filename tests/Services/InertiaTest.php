@@ -327,6 +327,23 @@ class InertiaTest extends TestCase
         self::assertIsInt($page['onceProps']['billing.plans']['expiresAt']);
     }
 
+    public function testLifecycleReportsPropCountsWithoutPropNamesOrValues(): void {
+        $hook = new RecordingInertiaLifecycleHook();
+        $inertia = $this->createInertia(['X-Inertia' => 'true'])->setLifecycleHook($hook);
+
+        $inertia->render('Users/Index', [
+            'users' => ['John'],
+            'permissions' => $inertia->defer(static fn(): array => ['edit']),
+        ]);
+
+        self::assertSame([
+            ['component' => 'Users/Index', 'inputPropCount' => 2, 'inertiaRequest' => true],
+        ], $hook->begins);
+        self::assertSame([
+            ['resolvedPropCount' => 1, 'deferredPropCount' => 1, 'rescuedPropCount' => 0],
+        ], $hook->completions);
+    }
+
     /**
      * @param array<string, string> $headers
      */
