@@ -1,7 +1,7 @@
 {
   "name": "lsr/inertia",
   "description": "Laser framework core - Inertia adapter",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "repositories": [
     {
       "type": "composer",
