@@ -45,6 +45,9 @@
   "minimum-stability": "stable",
   "require": {
     "php": ">=8.4",
+    "psr/http-client": "^1",
+    "psr/http-factory": "^1",
+    "psr/http-message": "^1|^2",
     "psr/http-server-middleware": "^1",
     "lsr/interfaces": "^0.3.16",
     "symfony/serializer": "^8|^7|^6"
