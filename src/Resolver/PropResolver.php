@@ -111,7 +111,14 @@ final readonly class PropResolver
      * @return array<string, mixed>
      */
     private function filterFrameworkProps(array $props): array {
-        unset($props['page'], $props['app'], $props['request']);
+        unset(
+            $props['page'],
+            $props['app'],
+            $props['request'],
+            $props['inertiaPage'],
+            $props['inertiaHead'],
+            $props['inertiaBody'],
+        );
 
         return $props;
     }

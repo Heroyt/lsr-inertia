@@ -14,6 +14,8 @@ use Lsr\Inertia\Data\OnceProp;
 use Lsr\Inertia\Lifecycle\InertiaLifecycleHookInterface;
 use Lsr\Inertia\Lifecycle\InertiaLifecycleScopeInterface;
 use Lsr\Inertia\Resolver\PropResolver;
+use Lsr\Inertia\Ssr\HttpRenderer;
+use Lsr\Inertia\Ssr\SsrException;
 use Lsr\Interfaces\TemplateParametersInterface;
 use Lsr\Interfaces\ViewFactoryInterface;
 use Psr\Http\Message\ResponseFactoryInterface;
@@ -22,11 +24,14 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Message\UriInterface;
 use Symfony\Component\Serializer\Exception\ExceptionInterface;
-use Symfony\Component\Serializer\SerializerInterface;
+use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 use Throwable;
+use UnexpectedValueException;
 
 class Inertia
 {
+    public const string SSR_ENABLED_ATTRIBUTE = 'inertia.ssr.enabled';
+
     public ?string $version = null;
     private ?InertiaLifecycleHookInterface $lifecycleHook = null;
 
@@ -35,7 +40,9 @@ class Inertia
         private readonly ResponseFactoryInterface $responseFactory,
         private readonly StreamFactoryInterface   $streamFactory,
         private readonly ViewFactoryInterface     $viewFactory,
-        private readonly SerializerInterface      $serializer,
+        private readonly NormalizerInterface      $normalizer,
+        private readonly ?HttpRenderer            $ssr = null,
+        private readonly InertiaOptions           $options = new InertiaOptions(),
     ) {
     }
 
@@ -113,29 +120,64 @@ class Inertia
                 'url' => $url ? (string)$url : (string)$this->request->getUri(),
                 'version' => $this->version,
             ], $resolvedProps->getPageMetadata());
+            $page = $this->normalizer->normalize($page, 'json', $this->options->normalizationContext);
+            if (!is_array($page)) {
+                throw new UnexpectedValueException('The normalized Inertia page must be an array.');
+            }
+
+            // One encoding for JSON responses, SSR transport, and the V3 script fallback.
+            // Escaped slashes prevent a prop containing </script> from closing that element.
+            $json = json_encode(
+                $page,
+                JSON_THROW_ON_ERROR | ($this->options->jsonEncodeOptions & ~JSON_UNESCAPED_SLASHES),
+            );
 
             if ($this->request->hasHeader('X-Inertia')) {
-                $json = $this->serializer->serialize($page, 'json');
                 return $this->responseFactory->createResponse()
                     ->withBody($this->streamFactory->createStream($json))
                     ->withHeader('Content-Type', 'application/json')
-                    ->withHeader('X-Inertia', 'true');
+                    ->withHeader('X-Inertia', 'true')
+                    ->withHeader('Vary', 'X-Inertia');
             }
 
-            // Pass inertia data to the template
-            if ($parameters instanceof TemplateParametersInterface) {
-                $parameters['inertiaPage'] = $page;
-                $templateParameters = $parameters;
+            $rendered = null;
+            if (
+                $this->ssr !== null
+                && $this->request->getMethod() === 'GET'
+                && $this->request->getAttribute(self::SSR_ENABLED_ATTRIBUTE) !== false
+            ) {
+                try {
+                    $rendered = $this->ssr->render($json);
+                } catch (SsrException $exception) {
+                    if ($this->options->throwOnSsrError) {
+                        throw $exception;
+                    }
+                    try {
+                        $scope?->recordException($exception);
+                    } catch (Throwable) {
+                        // Diagnostics must not prevent client-rendered fallback.
+                    }
+                }
+            }
+
+            $templateParameters = $parameters;
+            $templateParameters['inertiaPage'] = $page;
+            $templateParameters['inertiaHead'] = $rendered === null ? '' : implode("\n", $rendered->head);
+            if ($rendered !== null) {
+                // The renderer's body already contains the V3 page script and populated root.
+                $templateParameters['inertiaBody'] = $rendered->body;
             } else {
-                $templateParameters = $parameters;
-                $templateParameters['inertiaPage'] = $page;
+                $rootId = htmlspecialchars($this->options->rootId, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                $templateParameters['inertiaBody'] = '<script data-page="' . $rootId
+                    . '" type="application/json">' . $json . '</script><div id="' . $rootId . '"></div>';
             }
 
             $html = $this->viewFactory->viewToString($template, $templateParameters);
 
             return $this->responseFactory->createResponse()
                 ->withBody($this->streamFactory->createStream($html))
-                ->withHeader('Content-Type', 'text/html; charset=UTF-8');
+                ->withHeader('Content-Type', 'text/html; charset=UTF-8')
+                ->withHeader('Vary', 'X-Inertia');
         } catch (Throwable $exception) {
             try {
                 $scope?->recordException($exception);
