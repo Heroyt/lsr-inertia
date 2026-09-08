@@ -81,12 +81,12 @@ class InertiaExtension extends CompilerExtension
                 'options' => $options,
             ])
             ->setAutowired()
-            ->setTags(['lsr', 'inertia']);
+            ->setTags(['lsr' => true, 'inertia' => true]);
 
         $builder->addDefinition($this->prefix('middleware'))
             ->setType(InertiaMiddleware::class)
             ->setFactory(InertiaMiddleware::class)
             ->setAutowired()
-            ->setTags(['lsr', 'inertia', 'middleware']);
+            ->setTags(['lsr' => true, 'inertia' => true, 'middleware' => true]);
     }
 }
