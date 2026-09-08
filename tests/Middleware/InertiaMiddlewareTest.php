@@ -9,6 +9,7 @@ use Lsr\Inertia\Middleware\InertiaMiddleware;
 use Lsr\Inertia\Services\Inertia;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\Serializer;
@@ -23,14 +24,14 @@ class InertiaMiddlewareTest extends TestCase
         $this->psr17Factory = new Psr17Factory();
     }
 
-    public function testInertiaResponseVariesOnInertiaHeader(): void {
+    public function test_inertia_response_varies_on_inertia_header(): void {
         $middleware = $this->createMiddleware();
         $request = $this->psr17Factory
             ->createServerRequest('GET', 'https://example.test/users')
             ->withHeader('X-Inertia', 'true');
 
         $response = $middleware->process($request, new CallbackRequestHandler(
-            fn(): \Psr\Http\Message\ResponseInterface => $this->psr17Factory
+            fn (): ResponseInterface => $this->psr17Factory
                 ->createResponse()
                 ->withHeader('Vary', 'Accept'),
         ));
@@ -39,7 +40,7 @@ class InertiaMiddlewareTest extends TestCase
         self::assertSame(['Accept', 'X-Inertia'], $response->getHeader('Vary'));
     }
 
-    public function testVersionMismatchReturnsConflictWithFullLocation(): void {
+    public function test_version_mismatch_returns_conflict_with_full_location(): void {
         $middleware = $this->createMiddleware('new-version');
         $request = $this->psr17Factory
             ->createServerRequest('GET', 'https://example.test/users?active=1')
@@ -47,7 +48,7 @@ class InertiaMiddlewareTest extends TestCase
             ->withHeader('X-Inertia-Version', 'old-version');
 
         $response = $middleware->process($request, new CallbackRequestHandler(
-            fn(): \Psr\Http\Message\ResponseInterface => $this->psr17Factory->createResponse(),
+            fn (): ResponseInterface => $this->psr17Factory->createResponse(),
         ));
 
         self::assertSame(409, $response->getStatusCode());
@@ -55,14 +56,14 @@ class InertiaMiddlewareTest extends TestCase
         self::assertSame('', $response->getHeaderLine('X-Inertia'));
     }
 
-    public function testExistingInertiaVaryHeaderIsNotDuplicated(): void {
+    public function test_existing_inertia_vary_header_is_not_duplicated(): void {
         $middleware = $this->createMiddleware();
         $request = $this->psr17Factory
             ->createServerRequest('GET', 'https://example.test/users')
             ->withHeader('X-Inertia', 'true');
 
         $response = $middleware->process($request, new CallbackRequestHandler(
-            fn(): \Psr\Http\Message\ResponseInterface => $this->psr17Factory
+            fn (): ResponseInterface => $this->psr17Factory
                 ->createResponse()
                 ->withHeader('Vary', 'X-Inertia'),
         ));

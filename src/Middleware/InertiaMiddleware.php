@@ -26,7 +26,7 @@ class InertiaMiddleware implements MiddlewareInterface
         $request = $request->withAttribute($this->attributeKey, $inertia);
 
         $response = $handler->handle($request);
-        if (! $request->hasHeader('X-Inertia')) {
+        if ( ! $request->hasHeader('X-Inertia')) {
             return $response;
         }
 

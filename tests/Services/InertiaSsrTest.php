@@ -19,13 +19,16 @@ use PHPUnit\Framework\TestCase;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use RuntimeException;
+use stdClass;
+use Symfony\Component\Serializer\Exception\NotNormalizableValueException;
 use Symfony\Component\Serializer\Normalizer\DateTimeNormalizer;
 use Symfony\Component\Serializer\Serializer;
 use Tests\Fixtures\InertiaViewFactory;
 
 final class InertiaSsrTest extends TestCase
 {
-    public function testFallbackSafelyEmbedsNormalizedPageWithoutAnEncoder(): void {
+    public function test_fallback_safely_embeds_normalized_page_without_an_encoder(): void {
         $inertia = $this->inertia(options: new InertiaOptions(
             rootId: 'custom"root',
             normalizationContext: [DateTimeNormalizer::FORMAT_KEY => 'Y-m-d'],
@@ -38,7 +41,7 @@ final class InertiaSsrTest extends TestCase
             'sequence' => static function () use (&$calls): int {
                 return ++$calls;
             },
-            'later' => $inertia->defer(static fn() => throw new \RuntimeException('Must remain deferred.')),
+            'later' => $inertia->defer(static fn () => throw new RuntimeException('Must remain deferred.')),
         ]);
         $document = $this->document($response);
         $scripts = $document->getElementsByTagName('script');
@@ -56,7 +59,7 @@ final class InertiaSsrTest extends TestCase
         self::assertSame('X-Inertia', $response->getHeaderLine('Vary'));
     }
 
-    public function testRendererHeadAndCompleteBodyAppearOnceInTheDocument(): void {
+    public function test_renderer_head_and_complete_body_appear_once_in_the_document(): void {
         $client = $this->createMock(ClientInterface::class);
         $client->expects(self::once())->method('sendRequest')->willReturn($this->rendererResponse());
         $response = $this->inertia($client)->render('Index', ['message' => 'Rendered']);
@@ -69,7 +72,7 @@ final class InertiaSsrTest extends TestCase
         self::assertSame('true', $document->getElementById('app')->getAttribute('data-server-rendered'));
     }
 
-    public function testFailureFallsBackAndDoesNotLeakToTheNextRequest(): void {
+    public function test_failure_falls_back_and_does_not_leak_to_the_next_request(): void {
         $factory = new Psr17Factory();
         $client = $this->createMock(ClientInterface::class);
         $client->expects(self::exactly(2))->method('sendRequest')->willReturn(
@@ -86,7 +89,7 @@ final class InertiaSsrTest extends TestCase
         self::assertSame('Rendered content', $heading->textContent);
     }
 
-    public function testStrictModePropagatesRendererFailure(): void {
+    public function test_strict_mode_propagates_renderer_failure(): void {
         $factory = new Psr17Factory();
         $client = $this->createMock(ClientInterface::class);
         $client->method('sendRequest')->willReturn($factory->createResponse(500));
@@ -95,7 +98,7 @@ final class InertiaSsrTest extends TestCase
     }
 
     #[DataProvider('bypassedRequests')]
-    public function testNonEligibleRequestsNeverContactTheRenderer(string $method, bool $xhr, bool $enabled): void {
+    public function test_non_eligible_requests_never_contact_the_renderer(string $method, bool $xhr, bool $enabled): void {
         $factory = new Psr17Factory();
         $request = $factory->createServerRequest($method, 'https://example.test/');
         if ($xhr) {
@@ -121,7 +124,7 @@ final class InertiaSsrTest extends TestCase
         yield 'request opt-out' => ['GET', false, false];
     }
 
-    public function testGeneratedTemplateDataNeverBecomesPropsWhenParametersAreReused(): void {
+    public function test_generated_template_data_never_becomes_props_when_parameters_are_reused(): void {
         $parameters = new class (['message' => 'Visitor']) extends ArrayObject implements TemplateParametersInterface {
             public function getProps(): array {
                 return $this->getArrayCopy();
@@ -137,11 +140,11 @@ final class InertiaSsrTest extends TestCase
         self::assertSame(['message' => 'Visitor'], $this->page($response)['props']);
     }
 
-    public function testNormalizationErrorsDoNotBecomeSuccessfulFallbackResponses(): void {
+    public function test_normalization_errors_do_not_become_successful_fallback_responses(): void {
         $client = $this->createMock(ClientInterface::class);
         $client->expects(self::never())->method('sendRequest');
-        $this->expectException(\Symfony\Component\Serializer\Exception\NotNormalizableValueException::class);
-        $this->inertia($client)->render('Index', ['unsupported' => new \stdClass()]);
+        $this->expectException(NotNormalizableValueException::class);
+        $this->inertia($client)->render('Index', ['unsupported' => new stdClass()]);
     }
 
     private function inertia(

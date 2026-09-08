@@ -36,7 +36,7 @@ final class InertiaExtensionTest extends TestCase
         FileSystem::delete($this->directory);
     }
 
-    public function testDisabledSsrIgnoresClientAndHonorsRenderingOptionsWithoutRequestFactory(): void {
+    public function test_disabled_ssr_ignores_client_and_honors_rendering_options_without_request_factory(): void {
         $container = $this->createContainer([
             'rootId' => 'portal',
             'normalizationContext' => [DateTimeNormalizer::FORMAT_KEY => 'Y-m-d'],
@@ -57,14 +57,14 @@ final class InertiaExtensionTest extends TestCase
         self::assertStringContainsString('"amount":1.0', $html);
     }
 
-    public function testEnabledSsrRequiresClient(): void {
+    public function test_enabled_ssr_requires_client(): void {
         $this->expectException(ServiceCreationException::class);
         $this->expectExceptionMessage(ClientInterface::class);
 
         $this->createContainer(['ssr' => ['enabled' => true]], requestFactory: true);
     }
 
-    public function testEnabledSsrAutowiresApplicationClient(): void {
+    public function test_enabled_ssr_autowires_application_client(): void {
         $container = $this->createContainer(
             ['ssr' => ['enabled' => true]],
             static function (ContainerBuilder $builder): void {
@@ -79,7 +79,7 @@ final class InertiaExtensionTest extends TestCase
         self::assertStringContainsString('<main>Rendered by dedicated client</main>', (string) $response->getBody());
     }
 
-    public function testDedicatedClientReferenceDoesNotOverrideGlobalClientOrLeakRequestState(): void {
+    public function test_dedicated_client_reference_does_not_override_global_client_or_leak_request_state(): void {
         $container = $this->createContainer(
             ['ssr' => [
                 'enabled' => true,
@@ -114,7 +114,7 @@ final class InertiaExtensionTest extends TestCase
         self::assertSame([], $applicationClient->requests);
     }
 
-    public function testDedicatedClientStatementAndStrictErrorOptionAreUsed(): void {
+    public function test_dedicated_client_statement_and_strict_error_option_are_used(): void {
         $container = $this->createContainer(
             ['ssr' => [
                 'enabled' => true,

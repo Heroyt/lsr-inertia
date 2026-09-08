@@ -70,7 +70,7 @@ final class MergeProp implements InertiaPropInterface
      * @param string|array<int|string, string>|null $path
      */
     private function configure(array &$target, string|array|null $path, ?string $matchOn): void {
-        if (!$this->customized) {
+        if ( ! $this->customized) {
             $this->appendPaths = [];
             $this->customized = true;
         }

@@ -121,7 +121,7 @@ class Inertia
                 'version' => $this->version,
             ], $resolvedProps->getPageMetadata());
             $page = $this->normalizer->normalize($page, 'json', $this->options->normalizationContext);
-            if (!is_array($page)) {
+            if ( ! is_array($page)) {
                 throw new UnexpectedValueException('The normalized Inertia page must be an array.');
             }
 

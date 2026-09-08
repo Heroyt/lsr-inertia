@@ -24,7 +24,7 @@ final class WithInertiaTest extends TestCase
         $this->psr17Factory = new Psr17Factory();
     }
 
-    public function testRendersUsingControllerParams(): void {
+    public function test_renders_using_controller_params(): void {
         $controller = $this->createController([
             'X-Inertia' => 'true',
         ], [
@@ -36,7 +36,7 @@ final class WithInertiaTest extends TestCase
         self::assertSame(['John'], $props['users']);
     }
 
-    public function testRenderParametersCanBeOverridden(): void {
+    public function test_render_parameters_can_be_overridden(): void {
         $controller = $this->createController([
             'X-Inertia' => 'true',
         ], [
@@ -50,15 +50,15 @@ final class WithInertiaTest extends TestCase
         self::assertSame(['Jane'], $props['users']);
     }
 
-    public function testExposesInertiaPropHelpers(): void {
+    public function test_exposes_inertia_prop_helpers(): void {
         $controller = $this->createController();
 
-        self::assertInstanceOf(LazyProp::class, $controller->lazy(static fn(): array => []));
+        self::assertInstanceOf(LazyProp::class, $controller->lazy(static fn (): array => []));
         self::assertInstanceOf(AlwaysProp::class, $controller->always([]));
-        self::assertInstanceOf(DeferredProp::class, $controller->defer(static fn(): array => []));
+        self::assertInstanceOf(DeferredProp::class, $controller->defer(static fn (): array => []));
         self::assertInstanceOf(MergeProp::class, $controller->merge([]));
         self::assertInstanceOf(DeepMergeProp::class, $controller->deepMerge([]));
-        self::assertInstanceOf(OnceProp::class, $controller->once(static fn(): array => []));
+        self::assertInstanceOf(OnceProp::class, $controller->once(static fn (): array => []));
     }
 
     /**

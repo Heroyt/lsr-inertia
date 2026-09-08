@@ -49,15 +49,15 @@ final readonly class PropResolver
                 continue;
             }
 
-            if ($isPartial && !$this->shouldIncludePartialProp($key, $only, $except, $request)) {
+            if ($isPartial && ! $this->shouldIncludePartialProp($key, $only, $except, $request)) {
                 continue;
             }
 
-            if (!$isPartial && $prop instanceof LazyProp) {
+            if ( ! $isPartial && $prop instanceof LazyProp) {
                 continue;
             }
 
-            if (!$isPartial && $prop instanceof DeferredProp) {
+            if ( ! $isPartial && $prop instanceof DeferredProp) {
                 $deferred[$prop->getGroup()][] = $key;
                 continue;
             }
@@ -79,10 +79,10 @@ final readonly class PropResolver
                 ];
 
                 if (
-                    !$this->isExplicitlyRequested($key, $only, $request)
+                    ! $this->isExplicitlyRequested($key, $only, $request)
                     && isset($exceptOnce[$onceKey])
-                    && !$prop->shouldFresh()
-                    && !$prop->isExpired()
+                    && ! $prop->shouldFresh()
+                    && ! $prop->isExpired()
                 ) {
                     continue;
                 }
@@ -133,7 +133,7 @@ final readonly class PropResolver
         }
 
         if ($request->hasExcept()) {
-            return !isset($except[$key]);
+            return ! isset($except[$key]);
         }
 
         return true;
@@ -159,7 +159,7 @@ final readonly class PropResolver
             return $this->resolveNestedValue($value());
         }
 
-        if (!is_array($value)) {
+        if ( ! is_array($value)) {
             return $value;
         }
 
@@ -177,7 +177,7 @@ final readonly class PropResolver
      */
     private function prefixPaths(string $key, array $paths): array {
         return array_map(
-            static fn(?string $path): string => $path === null ? $key : $key . '.' . $path,
+            static fn (?string $path): string => $path === null ? $key : $key . '.' . $path,
             $paths,
         );
     }
@@ -189,7 +189,7 @@ final readonly class PropResolver
      */
     private function prefixStringPaths(string $key, array $paths): array {
         return array_map(
-            static fn(string $path): string => $key . '.' . $path,
+            static fn (string $path): string => $key . '.' . $path,
             $paths,
         );
     }

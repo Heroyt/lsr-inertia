@@ -54,7 +54,7 @@ final readonly class InertiaRequest
         return array_values(
             array_filter(
                 array_map('trim', explode(',', $this->request->getHeaderLine($header))),
-                static fn(string $value): bool => $value !== '',
+                static fn (string $value): bool => $value !== '',
             ),
         );
     }

@@ -24,8 +24,8 @@ final readonly class HttpRenderer
         if (
             filter_var($url, FILTER_VALIDATE_URL) === false
             || $parts === false
-            || !in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true)
-            || !isset($parts['host'])
+            || ! in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true)
+            || ! isset($parts['host'])
             || isset($parts['pass'])
             || isset($parts['user'])
             || isset($parts['fragment'])
@@ -63,18 +63,18 @@ final readonly class HttpRenderer
         }
 
         if (
-            !$page instanceof stdClass
-            || !isset($page->head, $page->body)
-            || !is_array($page->head)
-            || !array_is_list($page->head)
-            || !is_string($page->body)
+            ! $page instanceof stdClass
+            || ! isset($page->head, $page->body)
+            || ! is_array($page->head)
+            || ! array_is_list($page->head)
+            || ! is_string($page->body)
             || $page->body === ''
         ) {
             throw new SsrException('The SSR endpoint returned an invalid rendered page.');
         }
 
         foreach ($page->head as $entry) {
-            if (!is_string($entry)) {
+            if ( ! is_string($entry)) {
                 throw new SsrException('The SSR endpoint returned an invalid rendered page.');
             }
         }

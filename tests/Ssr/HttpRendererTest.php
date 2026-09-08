@@ -25,7 +25,7 @@ class HttpRendererTest extends TestCase
         $this->psr17Factory = new Psr17Factory();
     }
 
-    public function testRendersUsingExactConfiguredEndpointAndEncodedPage(): void {
+    public function test_renders_using_exact_configured_endpoint_and_encoded_page(): void {
         $pageJson = '{"component":"Home","props":{"ratio":1.0},"url":"/"}';
         $url = 'https://ssr.example.test:13714/dev/render?mode=development';
         $head = ['<title>Home</title>', '<meta name="description" content="Hello">'];
@@ -52,7 +52,7 @@ class HttpRendererTest extends TestCase
         self::assertSame($body, $page->body);
     }
 
-    public function testAcceptsEmptyHead(): void {
+    public function test_accepts_empty_head(): void {
         $page = $this->rendererRespondingWith(200, '{"head":[],"body":"<div id=app></div>"}')->render('{}');
 
         self::assertNotNull($page);
@@ -60,12 +60,12 @@ class HttpRendererTest extends TestCase
         self::assertSame('<div id=app></div>', $page->body);
     }
 
-    public function testSuccessfulJsonNullSignalsWarmup(): void {
+    public function test_successful_json_null_signals_warmup(): void {
         self::assertNull($this->rendererRespondingWith(200, 'null')->render('{}'));
     }
 
     #[DataProvider('invalidResponseProvider')]
-    public function testRejectsUnsuccessfulOrInvalidResponses(int $status, string $body): void {
+    public function test_rejects_unsuccessful_or_invalid_responses(int $status, string $body): void {
         $renderer = $this->rendererRespondingWith($status, $body);
 
         $this->expectException(SsrException::class);
@@ -93,7 +93,7 @@ class HttpRendererTest extends TestCase
         yield 'body must be a string' => [200, '{"head":[],"body":123}'];
     }
 
-    public function testMalformedJsonPreservesDecodeFailureWithoutExposingResponse(): void {
+    public function test_malformed_json_preserves_decode_failure_without_exposing_response(): void {
         $renderer = $this->rendererRespondingWith(200, '<html>private renderer diagnostics</html>');
 
         try {
@@ -105,7 +105,7 @@ class HttpRendererTest extends TestCase
         }
     }
 
-    public function testNetworkFailureIsWrappedWithoutRetryOrExposingPrivateDetails(): void {
+    public function test_network_failure_is_wrapped_without_retry_or_exposing_private_details(): void {
         $message = 'private endpoint and request data';
         $failure = new class ($message) extends RuntimeException implements ClientExceptionInterface {
         };
@@ -121,7 +121,7 @@ class HttpRendererTest extends TestCase
         }
     }
 
-    public function testProgrammingErrorsPropagateUnchanged(): void {
+    public function test_programming_errors_propagate_unchanged(): void {
         $failure = new LogicException('Client implementation bug');
         $client = $this->createMock(ClientInterface::class);
         $client->expects(self::once())->method('sendRequest')->willThrowException($failure);
@@ -135,7 +135,7 @@ class HttpRendererTest extends TestCase
     }
 
     #[DataProvider('invalidUrlProvider')]
-    public function testRejectsInvalidConfiguredEndpointsBeforeSending(string $url): void {
+    public function test_rejects_invalid_configured_endpoints_before_sending(string $url): void {
         $client = $this->createMock(ClientInterface::class);
         $client->expects(self::never())->method('sendRequest');
 
