@@ -1,5 +1,6 @@
 {
   "name": "lsr/inertia",
+  "license": "MIT",
   "description": "Laser framework core - Inertia adapter",
   "version": "0.1.8",
   "repositories": [
